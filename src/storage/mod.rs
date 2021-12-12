@@ -9,7 +9,16 @@ struct StorageHeader {
     block_len: u32,
 }
 
-const STORAGE_HEADER_SIZE: u32 = std::mem::size_of::<StorageHeader>() as u32;
+const STORAGE_HEADER_SIZE: usize = std::mem::size_of::<StorageHeader>();
+
+impl StorageHeader {
+    fn new(block_len: u32) -> Self {
+        StorageHeader { block_len }
+    }
+    fn to_bytes(&self) -> [u8; STORAGE_HEADER_SIZE] {
+        u32_to_bytes(self.block_len)
+    }
+}
 
 /// Header of each block
 /// - Stores size of data stored in the block as 4 bytes unsied integer as little endian
@@ -17,13 +26,16 @@ struct BlockHeader {
     block_data_size: u32,
 }
 
-const BLOCK_HEADER_SIZE: u32 = std::mem::size_of::<BlockHeader>() as u32;
+const BLOCK_HEADER_SIZE: usize = std::mem::size_of::<BlockHeader>();
 
 impl BlockHeader {
     fn new(block_data_size: u32) -> BlockHeader {
         BlockHeader {
             block_data_size: block_data_size,
         }
+    }
+    fn to_bytes(&self) -> [u8; BLOCK_HEADER_SIZE] {
+        u32_to_bytes(self.block_data_size)
     }
 }
 
@@ -40,10 +52,11 @@ pub struct Storage {
 }
 
 impl Storage {
-    fn open_new_file_writer(file_path: &String) -> Result<(File, u64), Error> {
+    fn open_file_writer(file_path: &String, truncate: bool) -> Result<(File, u64), Error> {
         let file_path_clone = file_path.clone();
         let file_writer_result = OpenOptions::new()
             .write(true)
+            .truncate(truncate)
             .create(true)
             .open(file_path_clone);
         if file_writer_result.is_err() {
@@ -75,7 +88,7 @@ impl Storage {
     /// - Create/Overwrite new storage file in given path
     /// - Initializes storage header
     pub fn new(file_path: String, block_len: usize) -> Result<Storage, Error> {
-        let file_writer = Storage::open_new_file_writer(&file_path);
+        let file_writer = Storage::open_file_writer(&file_path, true);
         if file_writer.is_err() {
             return Err(file_writer.unwrap_err());
         }
@@ -88,17 +101,14 @@ impl Storage {
         let (file_reader, read_pointer) = file_reader.unwrap();
 
         let mut storage = Storage {
-            header: StorageHeader {
-                block_len: block_len as u32,
-            },
+            header: StorageHeader::new(block_len as u32),
             free_blocks: BTreeSet::new(),
             file_writer,
             write_pointer,
             file_reader,
             read_pointer,
         };
-        let init_storage_result = storage.set_storage_header(storage.header.block_len as usize);
-        if init_storage_result.is_err() {
+        if storage.set_storage_header().is_err() {
             return Err(Error {
                 code: 2,
                 message: "Could not init storage".to_string(),
@@ -106,15 +116,34 @@ impl Storage {
         }
         Ok(storage)
     }
+
+    // TODO: Implement
+    /// Open existing storage file
+    // pub fn open(file_path: String) -> Result<Storage, Error> {
+        // let file_writer = Storage::open_file_writer(&file_path, false);
+        // if file_writer.is_err() {
+        //     return Err(file_writer.unwrap_err());
+        // }
+        // let (file_writer, write_pointer) = file_writer.unwrap();
+
+        // let file_reader = Storage::open_file_reader(&file_path);
+        // if file_reader.is_err() {
+        //     return Err(file_reader.unwrap_err());
+        // }
+        // let (file_reader, read_pointer) = file_reader.unwrap();
+    // }
+
+    // # File IO Functions
+
     /// Set storage header in storage file
     /// - Write storage header to file
     /// - NOTE: This can only be used once when creating a new storage file
-    fn set_storage_header(&mut self, block_len: usize) -> Result<usize, Error> {
+    fn set_storage_header(&mut self) -> Result<usize, Error> {
         use std::io::prelude::*;
         let file = &mut self.file_writer;
-        let header_bytes = u32_to_bytes(block_len as u32);
-        // - seek writer pointer to beginning of file
-        // - write storage header
+        // Write storage header to file
+        let header_bytes = self.header.to_bytes();
+        // -- seek writer pointer to beginning of file
         let ptr_seek_result = file.seek(std::io::SeekFrom::Start(0));
         if ptr_seek_result.is_err() {
             return Err(Error {
@@ -122,6 +151,7 @@ impl Storage {
                 message: "Could not seek file pointer".to_string(),
             });
         }
+        // -- write storage header
         self.write_pointer = ptr_seek_result.unwrap();
         let write_result = file.write(&header_bytes);
         if write_result.is_err() {
@@ -130,15 +160,14 @@ impl Storage {
                 message: "Could not write to file".to_string(),
             });
         }
-        // - verify write operation was successful
+        // -- verify write operation was successful
         let write_size = write_result.unwrap();
-        if write_size != header_bytes.len() {
+        if write_size != STORAGE_HEADER_SIZE as usize {
             return Err(Error {
                 code: 2,
                 message: "Could not write all header bytes to file".to_string(),
             });
         }
-        self.header.block_len = block_len as u32;
         self.write_pointer += write_size as u64;
         Ok(write_size)
     }
@@ -205,7 +234,7 @@ impl Storage {
                 message: "Could not seek to block offset".to_string(),
             });
         }
-        // - verify seek operation was successful
+        // -- verify seek operation was successful
         let seek_position = seek_result.unwrap();
         if seek_position != block_offset as u64 {
             return Err(Error {
@@ -214,9 +243,9 @@ impl Storage {
             });
         }
         // - Write Block Header
-        // -- write block header length to inital 4 bytes
-        let block_data_size_bytes = u32_to_bytes(data.len() as u32);
-        let write_result = self.file_writer.write(&block_data_size_bytes);
+        // -- write block header to inital BLOCK_HEADER_SIZE bytes
+        let block_header = BlockHeader::new(data.len() as u32);
+        let write_result = self.file_writer.write(&block_header.to_bytes());
         if write_result.is_err() {
             return Err(Error {
                 code: 6,
@@ -225,7 +254,7 @@ impl Storage {
         }
         let write_size = write_result.unwrap();
         // -- verify write operation was successful
-        if write_size != data.len() {
+        if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
                 code: 8,
                 message: "Could not write all data to file".to_string(),
