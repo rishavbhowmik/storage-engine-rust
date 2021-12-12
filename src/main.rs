@@ -2,7 +2,7 @@ mod storage;
 use storage::Storage;
 
 fn main() {
-    let mut storage = Storage::new("test.hex".to_string(), 8).unwrap();
+    let mut storage = Storage::new("tmp/test.hex".to_string(), 8).unwrap();
 
     let data_sets = [u32_to_bytes(8), u32_to_bytes(16), u32_to_bytes(32)];
 
