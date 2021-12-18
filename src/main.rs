@@ -4,7 +4,14 @@ use storage::Storage;
 fn main() {
     let mut storage = Storage::new("tmp/test.hex".to_string(), 8).unwrap();
 
-    let data_sets = [u32_to_bytes(8), u32_to_bytes(16), u32_to_bytes(32)];
+    let data_sets = [
+        u32_to_bytes(8),
+        u32_to_bytes(16),
+        u32_to_bytes(32),
+        u32_to_bytes(11),
+        u32_to_bytes(12),
+        u32_to_bytes(13),
+    ];
 
     let mut i = 0;
     for data in data_sets.iter() {
@@ -14,7 +21,22 @@ fn main() {
         } else {
             println!("{:?}", write_block_res.unwrap());
         }
-        let read_block_res = storage.read_block(0);
+
+        i += 1;
+    }
+    println!("Extra");
+    let write_block_res = storage.write_block(i, [u32_to_bytes(14), u32_to_bytes(15)].concat());
+    if write_block_res.is_err() {
+        println!("{:?}", write_block_res.unwrap_err());
+    } else {
+        println!("{:?}", write_block_res.unwrap());
+    }
+    storage.delete_block(0, false);
+    storage.delete_block(2, false);
+    storage.delete_block(3, true);
+    let mut i = 1; // skip first block
+    for _ in data_sets.iter() {
+        let read_block_res = storage.read_block(i);
         if read_block_res.is_err() {
             println!("{:?}", read_block_res.unwrap_err());
         } else {
