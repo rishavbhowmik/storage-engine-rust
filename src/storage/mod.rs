@@ -134,9 +134,9 @@ impl Storage {
         }
         Ok(storage)
     }
-
-    // TODO: Implement
     /// Open existing storage file
+    /// - Loads storage header
+    /// - Loads free blocks Set
     pub fn open(file_path: String) -> Result<Storage, Error> {
         let file_writer = Storage::open_file_writer(&file_path, false);
         if file_writer.is_err() {
