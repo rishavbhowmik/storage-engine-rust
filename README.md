@@ -67,3 +67,38 @@ Read blocks in uniform direction of sorted block indexes, can significantly impr
 ### Improve write performance with pool of blocks
 
 Write blocks in uniform direction of sorted block indexes, can significantly improve write performance and reduce disk wear.
+
+# Test coverage with grcov
+
+## Setup
+
+```sh
+# install grcov
+cargo install grcov
+# set env variables
+export RUSTC_BOOTSTRAP=1
+rustup component add llvm-tools-preview
+export RUSTFLAGS="-Zinstrument-coverage"
+cargo build
+export LLVM_PROFILE_FILE=".profraw"
+# prepare gcda files
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+export RUSTDOCFLAGS="-Cpanic=abort"
+# run build
+cargo build
+```
+
+## Make coverage report
+
+[Reffer mozilla grcov](https://github.com/mozilla/grcov#auto-formatting)
+
+```sh
+# Generate HTML report in target/debug/coverage/
+## remove existing gcda files
+rm target/debug/deps/*.gcda
+## run test
+cargo test
+# generate coverage report
+grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./docs/test_coverage/
+```
