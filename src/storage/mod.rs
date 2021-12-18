@@ -409,7 +409,15 @@ impl Storage {
             });
         }
         let read_size = read_result.unwrap() as u32;
-        self.read_pointer += read_size as u64;
+        // - verify read operation was successful
+        if read_size != block_header.block_data_size {
+            return Err(Error {
+                code: 4,
+                message: "Could not read all block data from file".to_string(),
+            });
+        }
+        // - update read pointer
+        self.read_pointer = seek_position + read_size as u64;
         // - return read_pointer and block_data
         Ok((self.read_pointer as usize, block_data))
     }
