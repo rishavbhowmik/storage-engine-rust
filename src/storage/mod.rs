@@ -321,7 +321,8 @@ impl Storage {
             // -- increment block index
             block_index += 1;
             // - seek reader pointer to end of block
-            let ptr_seek_result = file.seek(std::io::SeekFrom::Current(self.header.block_len as i64));
+            let ptr_seek_result =
+                file.seek(std::io::SeekFrom::Current(self.header.block_len as i64));
             if ptr_seek_result.is_err() {
                 return Err(Error {
                     code: 3,
