@@ -71,7 +71,6 @@ fn main() {
     } else {
         println!("{:?}", read_block_res.unwrap());
     }
-    i += 1;
 }
 
 /// convert 4 bytes unsinged integer little endian bytes array
