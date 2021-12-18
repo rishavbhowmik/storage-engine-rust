@@ -120,17 +120,17 @@ impl Storage {
     // TODO: Implement
     /// Open existing storage file
     // pub fn open(file_path: String) -> Result<Storage, Error> {
-        // let file_writer = Storage::open_file_writer(&file_path, false);
-        // if file_writer.is_err() {
-        //     return Err(file_writer.unwrap_err());
-        // }
-        // let (file_writer, write_pointer) = file_writer.unwrap();
+    // let file_writer = Storage::open_file_writer(&file_path, false);
+    // if file_writer.is_err() {
+    //     return Err(file_writer.unwrap_err());
+    // }
+    // let (file_writer, write_pointer) = file_writer.unwrap();
 
-        // let file_reader = Storage::open_file_reader(&file_path);
-        // if file_reader.is_err() {
-        //     return Err(file_reader.unwrap_err());
-        // }
-        // let (file_reader, read_pointer) = file_reader.unwrap();
+    // let file_reader = Storage::open_file_reader(&file_path);
+    // if file_reader.is_err() {
+    //     return Err(file_reader.unwrap_err());
+    // }
+    // let (file_reader, read_pointer) = file_reader.unwrap();
     // }
 
     // # File IO Functions
@@ -173,9 +173,9 @@ impl Storage {
     }
     pub fn read_block(&mut self, block_index: usize) -> Result<(usize, Vec<u8>), Error> {
         use std::io::prelude::*;
-        let block_size = self.header.block_len;
+        let block_length = self.header.block_len;
         let block_offset: usize = STORAGE_HEADER_SIZE as usize
-            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_size as usize);
+            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
         // - seek reader to block offset
         let seek_result = self
             .file_reader
@@ -221,9 +221,9 @@ impl Storage {
     }
     pub fn write_block(&mut self, block_index: usize, data: Vec<u8>) -> Result<usize, Error> {
         use std::io::prelude::*;
-        let block_size = self.header.block_len;
+        let block_length = self.header.block_len;
         let block_offset = STORAGE_HEADER_SIZE as usize
-            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_size as usize);
+            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -279,9 +279,81 @@ impl Storage {
         }
         let write_pointer: usize =
             block_offset as usize + BLOCK_HEADER_SIZE as usize + write_size as usize;
-        // update block header
+        // update free_blocks map
         let block_index = block_index as u32;
         self.free_blocks.remove(&block_index);
+        // return write pointer
+        Ok(write_pointer)
+    }
+    pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<(usize), Error> {
+        use std::io::prelude::*;
+        let block_length = self.header.block_len;
+        let block_offset = STORAGE_HEADER_SIZE as usize
+            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
+        // - seek writer to block offset
+        let seek_result = self
+            .file_writer
+            .seek(std::io::SeekFrom::Start(block_offset as u64));
+        if seek_result.is_err() {
+            return Err(Error {
+                code: 10,
+                message: "Could not seek to block offset".to_string(),
+            });
+        }
+        // -- verify seek operation was successful
+        let seek_position = seek_result.unwrap();
+        if seek_position != block_offset as u64 {
+            return Err(Error {
+                code: 10,
+                message: "Could not seek to block offset".to_string(),
+            });
+        }
+        // - Write Block Header
+        // -- write block header to inital BLOCK_HEADER_SIZE bytes
+        let block_header = BlockHeader::new(0);
+        let write_result = self.file_writer.write(&block_header.to_bytes());
+        if write_result.is_err() {
+            return Err(Error {
+                code: 11,
+                message: "Could not write to file".to_string(),
+            });
+        }
+        let write_size = write_result.unwrap();
+        let mut write_pointer: usize =
+            block_offset as usize + BLOCK_HEADER_SIZE as usize + write_size as usize;
+        // -- verify write operation was successful
+        if write_size != BLOCK_HEADER_SIZE {
+            return Err(Error {
+                code: 12,
+                message: "Could not write all data to file".to_string(),
+            });
+        }
+        // - hard delete block
+        if hard_delete == true {
+            // post successful block header write, writer pointer must be at data offset
+            // - overwrite full block with zeros
+            let block_data_of_zeros = vec![0u8; block_length as usize];
+            let write_result = self.file_writer.write(&block_data_of_zeros[..]);
+            if write_result.is_err() {
+                return Err(Error {
+                    code: 13,
+                    message: "Could not write to file".to_string(),
+                });
+            }
+            let write_size = write_result.unwrap();
+            // -- verify write operation was successful
+            if write_size != block_length as usize {
+                return Err(Error {
+                    code: 14,
+                    message: "Could not write all data to file".to_string(),
+                });
+            }
+            // -- increment write pointer
+            write_pointer += write_size as usize;
+        }
+        // update free_blocks map
+        let block_index = block_index as u32;
+        self.free_blocks.insert(block_index);
         // return write pointer
         Ok(write_pointer)
     }
