@@ -2,7 +2,7 @@ mod storage;
 use storage::Storage;
 
 fn main() {
-    let mut storage = Storage::new("tmp/test.hex".to_string(), 8).unwrap();
+    // let mut storage = Storage::new("tmp/test.hex".to_string(), 8).unwrap();
 
     let data_sets = [
         u32_to_bytes(8),
@@ -13,28 +13,33 @@ fn main() {
         u32_to_bytes(13),
     ];
 
-    let mut i = 0;
-    for data in data_sets.iter() {
-        let write_block_res = storage.write_block(i, data.to_vec());
-        if write_block_res.is_err() {
-            println!("{:?}", write_block_res.unwrap_err());
-        } else {
-            println!("{:?}", write_block_res.unwrap());
-        }
+    // let mut i = 0;
+    // for data in data_sets.iter() {
+    //     let write_block_res = storage.write_block(i, data.to_vec());
+    //     if write_block_res.is_err() {
+    //         println!("{:?}", write_block_res.unwrap_err());
+    //     } else {
+    //         println!("{:?}", write_block_res.unwrap());
+    //     }
 
-        i += 1;
-    }
-    println!("Extra");
-    let write_block_res = storage.write_block(i, [u32_to_bytes(14), u32_to_bytes(15)].concat());
-    if write_block_res.is_err() {
-        println!("{:?}", write_block_res.unwrap_err());
-    } else {
-        println!("{:?}", write_block_res.unwrap());
-    }
-    storage.delete_block(0, false);
-    storage.delete_block(2, false);
-    storage.delete_block(3, true);
-    let mut i = 1; // skip first block
+    //     i += 1;
+    // }
+    // println!("Extra");
+    // let write_block_res = storage.write_block(i, [u32_to_bytes(14), u32_to_bytes(15)].concat());
+    // if write_block_res.is_err() {
+    //     println!("{:?}", write_block_res.unwrap_err());
+    // } else {
+    //     println!("{:?}", write_block_res.unwrap());
+    // }
+    // storage.delete_block(0, false);
+    // println!("delete till {}", storage.delete_block(2, false).unwrap());
+    // println!("delete till {}", storage.delete_block(3, false).unwrap());
+    // println!("delete till {}", storage.delete_block(2, true).unwrap());
+    // println!("delete till {}", storage.delete_block(3, true).unwrap());
+
+    let mut storage = Storage::open("tmp/test.hex".to_string()).unwrap();
+
+    let mut i = 0; // skip first block
     for _ in data_sets.iter() {
         let read_block_res = storage.read_block(i);
         if read_block_res.is_err() {
