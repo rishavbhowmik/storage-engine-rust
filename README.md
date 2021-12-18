@@ -73,6 +73,7 @@ Write blocks in uniform direction of sorted block indexes, can significantly imp
 ## Setup
 
 [Reffer mozilla grcov](https://github.com/mozilla/grcov)
+[latest report](https://rishavbhowmik.github.io/storage-engine-rust/test_coverage/)
 
 ```sh
 # install grcov
