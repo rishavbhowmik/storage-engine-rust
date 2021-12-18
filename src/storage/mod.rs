@@ -45,6 +45,7 @@ use std::fs::{File, OpenOptions};
 pub struct Storage {
     header: StorageHeader,
     free_blocks: BTreeSet<u32>,
+    end_block_count: u32,
     file_writer: File,
     write_pointer: u64,
     file_reader: File,
@@ -102,10 +103,17 @@ impl Storage {
 
         let mut storage = Storage {
             header: StorageHeader::new(block_len as u32),
+            /// Map of empty blocks in the storage file
             free_blocks: BTreeSet::new(),
+            /// Number of blocks in the storage file (used or free)
+            end_block_count: 0,
+            /// File object for writing
             file_writer,
+            /// Index of last written byte in the file
             write_pointer,
+            /// File object for reading
             file_reader,
+            /// Index of last read byte in the file
             read_pointer,
         };
         if storage.set_storage_header().is_err() {
@@ -171,7 +179,28 @@ impl Storage {
         self.write_pointer += write_size as u64;
         Ok(write_size)
     }
+    fn block_exists(&mut self, block_index: u32) -> bool {
+        // check if block exists withing storage file bounds
+        block_index < self.end_block_count
+    }
+    /// Check if block exists, without reading it from file (in memory)
+    fn is_empty_block(&mut self, block_index: usize) -> bool {
+        let block_index = block_index as u32;
+        if self.block_exists(block_index) {
+            if self.free_blocks.contains(&block_index) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return true;
+        }
+    }
     pub fn read_block(&mut self, block_index: usize) -> Result<(usize, Vec<u8>), Error> {
+        if self.is_empty_block(block_index) {
+            // return current read_pointer and empty vector
+            return Ok((self.read_pointer as usize, Vec::new()));
+        }
         use std::io::prelude::*;
         let block_length = self.header.block_len;
         let block_offset: usize = STORAGE_HEADER_SIZE as usize
@@ -277,13 +306,17 @@ impl Storage {
                 message: "Could not write all data to file".to_string(),
             });
         }
-        let write_pointer: usize =
-            block_offset as usize + BLOCK_HEADER_SIZE as usize + write_size as usize;
-        // update free_blocks map
+        // - update write ptr
+        self.write_pointer = block_offset as u64 + BLOCK_HEADER_SIZE as u64 + write_size as u64;
+        // - update free_blocks map
         let block_index = block_index as u32;
         self.free_blocks.remove(&block_index);
+        // - update max_block_index
+        if block_index >= self.end_block_count {
+            self.end_block_count = block_index;
+        }
         // return write pointer
-        Ok(write_pointer)
+        Ok(self.write_pointer as usize)
     }
     pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<usize, Error> {
         use std::io::prelude::*;
@@ -319,8 +352,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
-        let mut write_pointer: usize =
-            block_offset as usize + BLOCK_HEADER_SIZE as usize + write_size as usize;
+        self.write_pointer = block_offset as u64 + BLOCK_HEADER_SIZE as u64 + write_size as u64;
         // -- verify write operation was successful
         if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
@@ -349,12 +381,12 @@ impl Storage {
                 });
             }
             // -- increment write pointer
-            write_pointer += write_size as usize;
+            self.write_pointer += write_size as u64;
         }
         // update free_blocks map
         let block_index = block_index as u32;
         self.free_blocks.insert(block_index);
         // return write pointer
-        Ok(write_pointer)
+        Ok(self.write_pointer as usize)
     }
 }
