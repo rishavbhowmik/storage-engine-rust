@@ -285,7 +285,7 @@ impl Storage {
         // return write pointer
         Ok(write_pointer)
     }
-    pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<(usize), Error> {
+    pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<usize, Error> {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
         let block_offset = STORAGE_HEADER_SIZE as usize
