@@ -179,11 +179,11 @@ impl Storage {
         self.write_pointer += write_size as u64;
         Ok(write_size)
     }
+    /// check if block is within storage file, without reading it from file (in memory)
     fn block_exists(&mut self, block_index: u32) -> bool {
-        // check if block exists withing storage file bounds
         block_index < self.end_block_count
     }
-    /// Check if block exists, without reading it from file (in memory)
+    /// Check if block is empty, without reading it from file (in memory)
     fn is_empty_block(&mut self, block_index: usize) -> bool {
         let block_index = block_index as u32;
         if self.block_exists(block_index) {
