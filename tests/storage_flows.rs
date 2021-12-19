@@ -11,7 +11,7 @@ fn read_full_file(file_name: &str) -> Vec<u8> {
 }
 
 fn remove_dir_contents(path: std::path::PathBuf) {
-    use std::fs::{remove_dir, read_dir, remove_file};
+    use std::fs::{read_dir, remove_dir, remove_file};
     let path_copy = path.clone();
     for entry in read_dir(path_copy).unwrap() {
         let entry = entry.unwrap();
@@ -33,12 +33,19 @@ fn remove_dir_contents(path: std::path::PathBuf) {
 fn storage_open_new_file() {
     fn fetch_state(state_file: &str) -> Vec<u8> {
         use std::path::PathBuf;
-        let path: PathBuf = ["tests/samples/storage_open_new_file_states", state_file].iter().collect();
+        let path: PathBuf = ["tests/samples/storage_open_new_file_states", state_file]
+            .iter()
+            .collect();
         read_full_file(path.to_str().unwrap())
     }
     // let tmp_file_path = "./tmp/storage_open_new_file.hex";
     let tmp_dir_path = tempfile::tempdir().unwrap().into_path();
-    let tmp_file_path: std::path::PathBuf = [tmp_dir_path.to_str().unwrap().to_string(), String::from("storage_open_new_file.hex")].iter().collect();
+    let tmp_file_path: std::path::PathBuf = [
+        tmp_dir_path.to_str().unwrap().to_string(),
+        String::from("storage_open_new_file.hex"),
+    ]
+    .iter()
+    .collect();
     let tmp_file_path = tmp_file_path.to_str().unwrap();
     // create new storage
     let storage_result = Storage::new(String::from(tmp_file_path), 8);
@@ -48,7 +55,9 @@ fn storage_open_new_file() {
     let actual = read_full_file(tmp_file_path);
     assert_eq!(expected, actual);
     // write to block 0
-    let block_0_data = vec![1 as u8, 2 as u8, 3 as u8, 4 as u8, 5 as u8, 6 as u8, 7 as u8, 8 as u8];
+    let block_0_data = vec![
+        1 as u8, 2 as u8, 3 as u8, 4 as u8, 5 as u8, 6 as u8, 7 as u8, 8 as u8,
+    ];
     let result = storage.write_block(0, &block_0_data);
     assert_eq!(result.is_ok(), true);
     let write_ptr = result.unwrap();
@@ -57,7 +66,9 @@ fn storage_open_new_file() {
     let actual = read_full_file(tmp_file_path);
     assert_eq!(expected, actual);
     // write to block 1
-    let block_1_data = vec![9 as u8, 10 as u8, 11 as u8, 12 as u8, 13 as u8, 14 as u8, 15 as u8, 16 as u8];
+    let block_1_data = vec![
+        9 as u8, 10 as u8, 11 as u8, 12 as u8, 13 as u8, 14 as u8, 15 as u8, 16 as u8,
+    ];
     let result = storage.write_block(1, &block_1_data);
     assert_eq!(result.is_ok(), true);
     let write_ptr = result.unwrap();
@@ -98,7 +109,7 @@ fn storage_open_new_file() {
     let (read_ptr, actual_data) = result.unwrap();
     assert_eq!(read_ptr, 16); // no change
     assert_eq!(actual_data.len(), 0); // no data
-    // soft delete_block 0
+                                      // soft delete_block 0
     let result = storage.delete_block(0, false);
     assert_eq!(result.is_ok(), true);
     let write_ptr = result.unwrap();
