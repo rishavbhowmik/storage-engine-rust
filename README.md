@@ -62,8 +62,44 @@ Blocks with data_length 0, which can be reused to store new data.
 
 ### Improve read performance with pool of blocks
 
-Read blocks in uniform direction of sorted block indexes, can significantly improve read performance and reduce disk wear.
+Read blocks in assending order of sorted block indexes, can significantly improve read performance and reduce disk wear. (Assending order as HardDisk only rotates in one direction)
 
 ### Improve write performance with pool of blocks
 
 Write blocks in uniform direction of sorted block indexes, can significantly improve write performance and reduce disk wear.
+
+# Test coverage with grcov
+
+## Setup
+
+[Reffer mozilla grcov](https://github.com/mozilla/grcov)
+[latest report](https://rishavbhowmik.github.io/storage-engine-rust/test_coverage/)
+
+```sh
+# install grcov
+cargo install grcov
+# set env variables
+export RUSTC_BOOTSTRAP=1
+rustup component add llvm-tools-preview
+export RUSTFLAGS="-Zinstrument-coverage"
+cargo build
+export LLVM_PROFILE_FILE=".profraw"
+# prepare gcda files
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+export RUSTDOCFLAGS="-Cpanic=abort"
+# run build
+cargo build
+```
+
+## Make coverage report
+
+```sh
+# Generate HTML report in target/debug/coverage/
+## remove existing gcda files
+rm target/debug/deps/*.gcda
+## run test
+cargo test
+# generate coverage report
+grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./docs/test_coverage/
+```
