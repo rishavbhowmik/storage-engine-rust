@@ -62,7 +62,7 @@ Blocks with data_length 0, which can be reused to store new data.
 
 ### Improve read performance with pool of blocks
 
-Read blocks in uniform direction of sorted block indexes, can significantly improve read performance and reduce disk wear.
+Read blocks in assending order of sorted block indexes, can significantly improve read performance and reduce disk wear. (Assending order as HardDisk only rotates in one direction)
 
 ### Improve write performance with pool of blocks
 
