@@ -10,6 +10,25 @@ fn read_full_file(file_name: &str) -> Vec<u8> {
     }
 }
 
+fn remove_dir_contents(path: std::path::PathBuf) {
+    use std::fs::{remove_dir, read_dir, remove_file};
+    let path_copy = path.clone();
+    for entry in read_dir(path_copy).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if entry.file_type().unwrap().is_dir() {
+            let path_copy = path.clone();
+            remove_dir_contents(path_copy);
+            let path_copy = path.clone();
+            remove_dir(path_copy).unwrap();
+        } else {
+            remove_file(path).unwrap();
+        }
+    }
+    let path_copy = path.clone();
+    remove_dir(path_copy).unwrap();
+}
+
 #[test]
 fn storage_open_new_file() {
     fn fetch_state(state_file: &str) -> Vec<u8> {
@@ -17,7 +36,10 @@ fn storage_open_new_file() {
         let path: PathBuf = ["tests/samples/storage_open_new_file_states", state_file].iter().collect();
         read_full_file(path.to_str().unwrap())
     }
-    let tmp_file_path = "./tmp/storage_open_new_file.hex";
+    // let tmp_file_path = "./tmp/storage_open_new_file.hex";
+    let tmp_dir_path = tempfile::tempdir().unwrap().into_path();
+    let tmp_file_path: std::path::PathBuf = [tmp_dir_path.to_str().unwrap().to_string(), String::from("storage_open_new_file.hex")].iter().collect();
+    let tmp_file_path = tmp_file_path.to_str().unwrap();
     // create new storage
     let storage_result = Storage::new(String::from(tmp_file_path), 8);
     assert_eq!(storage_result.is_ok(), true);
@@ -108,6 +130,9 @@ fn storage_open_new_file() {
     let expected = fetch_state("on_hard_delete_block_2.hex");
     let actual = read_full_file(tmp_file_path);
     assert_eq!(expected, actual);
+
+    // clear clutter
+    remove_dir_contents(std::path::PathBuf::from(tmp_dir_path));
 }
 
 #[test]
