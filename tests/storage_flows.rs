@@ -109,3 +109,9 @@ fn storage_open_new_file() {
     let actual = read_full_file(tmp_file_path);
     assert_eq!(expected, actual);
 }
+
+#[test]
+fn storage_open_existing_file1() {}
+
+#[test]
+fn storage_open_existing_file2() {}
