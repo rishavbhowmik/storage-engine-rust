@@ -3,6 +3,8 @@ use error::Error;
 mod util;
 use util::*;
 
+//  ... ... ... ... ... ... ... ... Storage Header ... ... ... ... ... ... ... ... ... ..
+
 /// Main Header for storage file
 /// - Stores constant capacity of each block as 4 bytes unsied integer as little endian
 struct StorageHeader {
@@ -23,6 +25,37 @@ impl StorageHeader {
         u32_to_bytes(self.block_len)
     }
 }
+
+#[cfg(test)]
+mod unit_tests_storage_header {
+    use super::*;
+    #[test]
+    fn test_storage_header_to_bytes() {
+        let storage_header = StorageHeader::new(16777472);
+        let bytes = storage_header.to_bytes();
+        assert_eq!(bytes, [0, 1, 0, 1]);
+    }
+    #[test]
+    fn test_storage_header_from_bytes() {
+        let storage_header = StorageHeader::from_bytes(&[0, 2, 0, 2]);
+        assert_eq!(storage_header.block_len, 33554944);
+    }
+    #[test]
+    fn test_storage_header_full_flow() {
+        let block_length = 16777472;
+        let expected_bytes = [0, 1, 0, 1];
+        let storage_header = StorageHeader::new(block_length);
+        assert_eq!(storage_header.block_len, block_length);
+        let bytes = storage_header.to_bytes();
+        assert_eq!(bytes, expected_bytes);
+        let storage_header = StorageHeader::from_bytes(&bytes);
+        assert_eq!(storage_header.block_len, block_length);
+    }
+}
+
+// ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ..
+
+//  ... ... ... ... ... ... ... ... Block Header ... ... ... ... ... ... ... ... ... ....
 
 /// Header of each block
 /// - Stores size of data stored in the block as 4 bytes unsied integer as little endian
@@ -49,6 +82,37 @@ impl BlockHeader {
     }
 }
 
+#[cfg(test)]
+mod unit_test_block_header {
+    use super::*;
+    #[test]
+    fn test_block_header_to_bytes() {
+        let block_header = BlockHeader::new(16777472);
+        let bytes = block_header.to_bytes();
+        assert_eq!(bytes, [0, 1, 0, 1]);
+    }
+    #[test]
+    fn test_block_header_from_bytes() {
+        let block_header = BlockHeader::from_bytes(&[0, 2, 0, 2]);
+        assert_eq!(block_header.block_data_size, 33554944);
+    }
+    #[test]
+    fn test_block_header_full_flow() {
+        let block_data_size = 16777472;
+        let expected_bytes = [0, 1, 0, 1];
+        let block_header = BlockHeader::new(block_data_size);
+        assert_eq!(block_header.block_data_size, block_data_size);
+        let bytes = block_header.to_bytes();
+        assert_eq!(bytes, expected_bytes);
+        let block_header = BlockHeader::from_bytes(&bytes);
+        assert_eq!(block_header.block_data_size, block_data_size);
+    }
+}
+
+// ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ..
+
+// ... ... ... ... ... ... ... ... ... Storage ... ... ... ... ... ... ... ... ... ....
+
 use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
 
@@ -69,6 +133,13 @@ pub struct Storage {
 }
 
 impl Storage {
+    //  ... ... ... ... ... ... Static Functions ... ... ... ... ... ... .
+
+    /// Open storage file for writing
+    /// - creates a new file if it does not exist
+    /// - truncate: if true, truncates the file to 0 bytes
+    /// - truncate: if false, no modification to the file
+    /// - returns: (file_object_for_writing, write_pointer) - write_pointer is always 0
     fn open_file_writer(file_path: &String, truncate: bool) -> Result<(File, u64), Error> {
         let file_path_clone = file_path.clone();
         let file_writer_result = OpenOptions::new()
@@ -86,7 +157,8 @@ impl Storage {
         let write_pointer = 0 as u64;
         Ok((file_writer, write_pointer))
     }
-
+    /// Open storage file for reading
+    /// - returns: (file_object_for_reading, read_pointer) - read_pointer is always 0
     fn open_file_reader(file_path: &String) -> Result<(File, u64), Error> {
         let file_path_clone = file_path.clone();
         let file_reader_result = OpenOptions::new().read(true).open(file_path_clone);
@@ -100,6 +172,8 @@ impl Storage {
         let read_pointer = 0 as u64;
         Ok((file_reader, read_pointer))
     }
+
+    // // ... ... ... ... ... Storage Constructors ... ... ... ... ... .
 
     /// Create new storage file
     /// - Create/Overwrite new storage file in given path
@@ -175,12 +249,38 @@ impl Storage {
         }
         Ok(storage)
     }
+    // // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ....
 
-    // # File IO Functions
+    // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
+
+    // ... ... ... ... ... . InMemory Logic Functions ... ... ... ... ....
+
+    /// check if block is within storage file, without reading it from file (in memory)
+    fn block_exists(&mut self, block_index: u32) -> bool {
+        block_index < self.end_block_count
+    }
+    /// Check if block is empty, without reading it from file (in memory)
+    fn is_empty_block(&mut self, block_index: usize) -> bool {
+        let block_index = block_index as u32;
+        if self.block_exists(block_index) {
+            if self.free_blocks.contains(&block_index) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return true;
+        }
+    }
+
+    // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
+
+    // ... ... ... ... ... ... File IO Functions ... ... ... ... ... ... .
 
     /// Set storage header in storage file
     /// - Write storage header to file
     /// - NOTE: This can only be used once when creating a new storage file
+    /// - returns: write pointer
     fn set_storage_header(&mut self) -> Result<usize, Error> {
         use std::io::prelude::*;
         let file = &mut self.file_writer;
@@ -212,11 +312,12 @@ impl Storage {
             });
         }
         self.write_pointer += write_size as u64;
-        Ok(write_size)
+        Ok(self.write_pointer as usize)
     }
     /// Get storage header from storage file
     /// - Read storage header from file
     /// - update storage header in object
+    /// - returns: read pointer
     fn get_storage_header(&mut self) -> Result<usize, Error> {
         use std::io::prelude::*;
         let file = &mut self.file_reader;
@@ -259,6 +360,7 @@ impl Storage {
     /// Count number of blocks in storage file
     /// -- total blocks - update self.end_block_count
     /// -- free blocks - update self.free_blocks
+    /// - returns: read pointer
     fn read_storage_block_headers(&mut self) -> Result<usize, Error> {
         use std::io::prelude::*;
         let file = &mut self.file_reader;
@@ -344,23 +446,9 @@ impl Storage {
         // - return
         Ok(self.read_pointer as usize)
     }
-    /// check if block is within storage file, without reading it from file (in memory)
-    fn block_exists(&mut self, block_index: u32) -> bool {
-        block_index < self.end_block_count
-    }
-    /// Check if block is empty, without reading it from file (in memory)
-    fn is_empty_block(&mut self, block_index: usize) -> bool {
-        let block_index = block_index as u32;
-        if self.block_exists(block_index) {
-            if self.free_blocks.contains(&block_index) {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return true;
-        }
-    }
+    /// Read block data from storage file
+    /// - return (block_data, read_pointer)
+    /// - returns: read pointer
     pub fn read_block(&mut self, block_index: usize) -> Result<(usize, Vec<u8>), Error> {
         if self.is_empty_block(block_index) {
             // return current read_pointer and empty vector
@@ -567,4 +655,8 @@ impl Storage {
         // return write pointer
         Ok(self.write_pointer as usize)
     }
+
+    // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
 }
+
+// ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ..
