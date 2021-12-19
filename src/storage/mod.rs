@@ -532,6 +532,7 @@ impl Storage {
                 message: "Could not seek to block offset".to_string(),
             });
         }
+        self.write_pointer = seek_position;
         // - Write Block Header
         // -- write block header to inital BLOCK_HEADER_SIZE bytes
         let block_header = BlockHeader::new(data.len() as u32);
@@ -543,6 +544,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
+        self.write_pointer += write_size as u64;
         // -- verify write operation was successful
         if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
@@ -560,6 +562,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
+        self.write_pointer += write_size as u64;
         // -- verify write operation was successful
         if write_size != data.len() {
             return Err(Error {
@@ -567,8 +570,6 @@ impl Storage {
                 message: "Could not write all data to file".to_string(),
             });
         }
-        // - update write ptr
-        self.write_pointer = block_offset as u64 + BLOCK_HEADER_SIZE as u64 + write_size as u64;
         // - update free_blocks map
         let block_index = block_index as u32;
         self.free_blocks.remove(&block_index);
