@@ -608,6 +608,7 @@ impl Storage {
                 message: "Could not seek to block offset".to_string(),
             });
         }
+        self.write_pointer = block_offset as u64;
         // - Write Block Header
         // -- write block header to inital BLOCK_HEADER_SIZE bytes
         let block_header = BlockHeader::new(0);
@@ -619,7 +620,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
-        self.write_pointer = block_offset as u64 + BLOCK_HEADER_SIZE as u64 + write_size as u64;
+        self.write_pointer += write_size as u64;
         // -- verify write operation was successful
         if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
