@@ -147,7 +147,55 @@ fn storage_open_new_file() {
 }
 
 #[test]
-fn storage_open_existing_file1() {}
+fn storage_open_existing_file1() {
+    fn fetch_state(state_file: &str) -> Vec<u8> {
+        use std::path::PathBuf;
+        let path: PathBuf = ["tests/samples/storage_open_existing_file1", state_file]
+            .iter()
+            .collect();
+        read_full_file(path.to_str().unwrap())
+    }
+    // let tmp_file_path = "./tmp/storage_open_existing_file1.hex";
+    let tmp_dir_path = tempfile::tempdir().unwrap().into_path();
+    let tmp_file_path: std::path::PathBuf = [
+        tmp_dir_path.to_str().unwrap().to_string(),
+        String::from("storage_open_existing_file1.hex"),
+    ]
+    .iter()
+    .collect();
+    println!("tmp_file_path: {:?}", tmp_file_path);
+    // copy "tests/samples/storage_open_existing_file1/w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2.hex" to tmp_file_path
+    let mut src_path = std::path::PathBuf::from("tests/samples/storage_open_existing_file1");
+    src_path.push("w-0_w-1_w-2_w-3_sd-0_hd-0_sd-1_hd-2.hex");
+    std::fs::copy(src_path, tmp_file_path.clone()).unwrap();
+    // open storage
+    let mut storage = Storage::open(String::from(tmp_file_path.to_str().unwrap())).unwrap();
+    // read from block 0
+    let result = storage.read_block(0);
+    assert_eq!(result.is_ok(), true);
+    let (_, actual_data) = result.unwrap();
+    assert_eq!(actual_data.len(), 0); // no data
+    // read from block 1
+    let result = storage.read_block(1);
+    assert_eq!(result.is_ok(), true);
+    let (_, actual_data) = result.unwrap();
+    assert_eq!(actual_data.len(), 0); // no data
+    // read from block 2
+    let result = storage.read_block(2);
+    assert_eq!(result.is_ok(), true);
+    let (read_ptr, actual_data) = result.unwrap();
+    assert_eq!(read_ptr, 36); // 4 + (4 + 8) * 2 + 4 + 4
+    let block_2_data = vec![17 as u8, 18 as u8, 19 as u8, 20 as u8];
+    assert_eq!(actual_data, block_2_data); // no data
+    // read from block 3
+    let result = storage.read_block(3);
+    assert_eq!(result.is_ok(), true);
+    let (read_ptr, actual_data) = result.unwrap();
+    assert_eq!(read_ptr, 36); // no change
+    assert_eq!(actual_data.len(), 0); // no data
+    // clear clutter
+    remove_dir_contents(std::path::PathBuf::from(tmp_dir_path));
+}
 
 #[test]
 fn storage_open_existing_file2() {}
