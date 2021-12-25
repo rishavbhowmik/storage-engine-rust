@@ -163,13 +163,13 @@ fn storage_open_existing_file1() {
     ]
     .iter()
     .collect();
-    println!("tmp_file_path: {:?}", tmp_file_path);
     // copy "tests/samples/storage_open_existing_file1/w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2.hex" to tmp_file_path
     let mut src_path = std::path::PathBuf::from("tests/samples/storage_open_existing_file1");
-    src_path.push("w-0_w-1_w-2_w-3_sd-0_hd-0_sd-1_hd-2.hex");
+    src_path.push("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2.hex");
     std::fs::copy(src_path, tmp_file_path.clone()).unwrap();
+    let tmp_file_path = tmp_file_path.to_str().unwrap();
     // open storage
-    let mut storage = Storage::open(String::from(tmp_file_path.to_str().unwrap())).unwrap();
+    let mut storage = Storage::open(String::from(tmp_file_path)).unwrap();
     // read from block 0
     let result = storage.read_block(0);
     assert_eq!(result.is_ok(), true);
@@ -193,9 +193,50 @@ fn storage_open_existing_file1() {
     let (read_ptr, actual_data) = result.unwrap();
     assert_eq!(read_ptr, 36); // no change
     assert_eq!(actual_data.len(), 0); // no data
+    
+    // write to block 3
+    let block_3_data = vec![3 as u8, 9 as u8, 27 as u8];
+    let result = storage.write_block(3, &block_3_data);
+    assert_eq!(result.is_ok(), true);
+    let write_ptr = result.unwrap();
+    assert_eq!(write_ptr, 47); // 4 + (4 + 8) * 3 + 4 + 3
+    let expected = fetch_state("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2_w-3.hex");
+    let actual = read_full_file(tmp_file_path);
+    assert_eq!(expected, actual);
+    // write to block 4
+    let block_4_data = vec![4 as u8, 8 as u8, 16 as u8, 32 as u8];
+    let result = storage.write_block(4, &block_4_data);
+    assert_eq!(result.is_ok(), true);
+    let write_ptr = result.unwrap();
+    assert_eq!(write_ptr, 60); // 4 + (4 + 8) * 4 + 4 + 4
+    let expected = fetch_state("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2_w-3_w-4.hex");
+    let actual = read_full_file(tmp_file_path);
+    assert_eq!(expected, actual);
+    // write to block 5
+    let block_5_data = vec![5 as u8, 10 as u8, 20 as u8, 40 as u8, 80 as u8];
+    let result = storage.write_block(5, &block_5_data);
+    assert_eq!(result.is_ok(), true);
+    let write_ptr = result.unwrap();
+    assert_eq!(write_ptr, 73); // 4 + (4 + 8) * 5 + 4 + 5
+    let expected = fetch_state("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2_w-3_w-4_w-5.hex");
+    let actual = read_full_file(tmp_file_path);
+    assert_eq!(expected, actual);
     // TODO:
-    // - test write_block
-    // - test delete_block
+    // soft delete block 1
+    let result = storage.delete_block(1, false);
+    assert_eq!(result.is_ok(), true);
+    let write_ptr = result.unwrap();
+    assert_eq!(write_ptr, 73); // no change
+    let actual = read_full_file(tmp_file_path);
+    assert_eq!(expected, actual);
+    // soft delete block 3
+    let result = storage.delete_block(3, false);
+    assert_eq!(result.is_ok(), true);
+    let write_ptr = result.unwrap();
+    assert_eq!(write_ptr, 44); // 4 + (4 + 8) * 3 + 4
+    let expected = fetch_state("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2_w-3_w-4_w-5_sd-3.hex");
+    let actual = read_full_file(tmp_file_path);
+    assert_eq!(expected, actual);
     // clear clutter
     remove_dir_contents(std::path::PathBuf::from(tmp_dir_path));
 }
