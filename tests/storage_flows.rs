@@ -175,25 +175,25 @@ fn storage_open_existing_file1() {
     assert_eq!(result.is_ok(), true);
     let (_, actual_data) = result.unwrap();
     assert_eq!(actual_data.len(), 0); // no data
-    // read from block 1
+                                      // read from block 1
     let result = storage.read_block(1);
     assert_eq!(result.is_ok(), true);
     let (_, actual_data) = result.unwrap();
     assert_eq!(actual_data.len(), 0); // no data
-    // read from block 2
+                                      // read from block 2
     let result = storage.read_block(2);
     assert_eq!(result.is_ok(), true);
     let (read_ptr, actual_data) = result.unwrap();
     assert_eq!(read_ptr, 36); // 4 + (4 + 8) * 2 + 4 + 4
     let block_2_data = vec![17 as u8, 18 as u8, 19 as u8, 20 as u8];
     assert_eq!(actual_data, block_2_data); // no data
-    // read from block 3
+                                           // read from block 3
     let result = storage.read_block(3);
     assert_eq!(result.is_ok(), true);
     let (read_ptr, actual_data) = result.unwrap();
     assert_eq!(read_ptr, 36); // no change
     assert_eq!(actual_data.len(), 0); // no data
-    
+
     // write to block 3
     let block_3_data = vec![3 as u8, 9 as u8, 27 as u8];
     let result = storage.write_block(3, &block_3_data);
