@@ -193,6 +193,9 @@ fn storage_open_existing_file1() {
     let (read_ptr, actual_data) = result.unwrap();
     assert_eq!(read_ptr, 36); // no change
     assert_eq!(actual_data.len(), 0); // no data
+    // TODO:
+    // - test write_block
+    // - test delete_block
     // clear clutter
     remove_dir_contents(std::path::PathBuf::from(tmp_dir_path));
 }
