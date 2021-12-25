@@ -476,6 +476,7 @@ impl Storage {
                 message: "Could not seek to block offset".to_string(),
             });
         }
+        self.read_pointer = seek_position;
         // - read block data length from inital 4 bytes
         let block_data_size_bytes = &mut [0u8; 4];
         let read_result = self.file_reader.read(block_data_size_bytes);
@@ -485,7 +486,14 @@ impl Storage {
                 message: "Could not read from file".to_string(),
             });
         }
-        let _ = read_result.unwrap();
+        let read_size = read_result.unwrap();
+        if read_size != BLOCK_HEADER_SIZE {
+            return Err(Error {
+                code: 2,
+                message: "Could not read all block data size bytes from file".to_string(),
+            });
+        }
+        self.read_pointer += read_size as u64;
         let block_header = BlockHeader::new(bytes_to_u32(block_data_size_bytes));
         // - read block data to vec
         let mut block_data = vec![0u8; block_header.block_data_size as usize];
@@ -497,6 +505,7 @@ impl Storage {
             });
         }
         let read_size = read_result.unwrap() as u32;
+        self.read_pointer += read_size as u64;
         // - verify read operation was successful
         if read_size != block_header.block_data_size {
             return Err(Error {
@@ -504,8 +513,6 @@ impl Storage {
                 message: "Could not read all block data from file".to_string(),
             });
         }
-        // - update read pointer
-        self.read_pointer = seek_position + BLOCK_HEADER_SIZE as u64 + read_size as u64;
         // - return read_pointer and block_data
         Ok((self.read_pointer as usize, block_data))
     }
