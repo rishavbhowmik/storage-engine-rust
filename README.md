@@ -68,6 +68,41 @@ Read blocks in assending order of sorted block indexes, can significantly improv
 
 Write blocks in uniform direction of sorted block indexes, can significantly improve write performance and reduce disk wear.
 
+## IO cycles
+
+- Atomic Lock
+- Serve Reads
+- Allocate blocks for writes
+- Atomic Lock
+- Write to allocated blocks
+- Serve Delete requests
+- Atomic Lock
+
+## Write Buffer
+
+The final purpose of this project is to store data of unbounded size.
+
+Steps to write data:
+
+- Atomic Lock
+- Allocate blocks to write data.
+- Atomic Lock
+- Write data in blocks.
+- Atomic Lock
+
+### Atomic Allocation of blocks
+
+- Collect Allocation requests.
+- Copy free blocks as ArrayList.
+- Sort blocks in assending order.
+- If blocks are enough, allocate blocks, with index greater than last used block index.
+- Assign block indexes to the respective requests, in serial sets.
+
+### Atomic Write of blocks
+- Lock Allocation of blocks.
+- Serve write requests in assending order.
+- Unlock Allocation of blocks.
+
 # Test coverage with grcov
 
 ## Setup
