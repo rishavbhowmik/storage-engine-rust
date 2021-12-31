@@ -119,17 +119,17 @@ use std::fs::{File, OpenOptions};
 pub struct Storage {
     header: StorageHeader,
     /// Map of empty blocks in the storage file
-    free_blocks: BTreeSet<u32>,
+    free_blocks: BTreeSet<usize>,
     /// Number of blocks in the storage file (used or free)
-    end_block_count: u32,
+    end_block_count: usize,
     /// File object for writing
     file_writer: File,
     /// Index of last written byte in the file
-    write_pointer: u64,
+    write_pointer: usize,
     /// File object for reading
     file_reader: File,
     /// Index of last read byte in the file
-    read_pointer: u64,
+    read_pointer: usize,
 }
 
 impl Storage {
@@ -140,7 +140,7 @@ impl Storage {
     /// - truncate: if true, truncates the file to 0 bytes
     /// - truncate: if false, no modification to the file
     /// - returns: (file_object_for_writing, write_pointer) - write_pointer is always 0
-    fn open_file_writer(file_path: &String, truncate: bool) -> Result<(File, u64), Error> {
+    fn open_file_writer(file_path: &String, truncate: bool) -> Result<(File, usize), Error> {
         let file_path_clone = file_path.clone();
         let file_writer_result = OpenOptions::new()
             .write(true)
@@ -154,12 +154,12 @@ impl Storage {
             });
         }
         let file_writer = file_writer_result.unwrap();
-        let write_pointer = 0 as u64;
+        let write_pointer = 0 as usize;
         Ok((file_writer, write_pointer))
     }
     /// Open storage file for reading
     /// - returns: (file_object_for_reading, read_pointer) - read_pointer is always 0
-    fn open_file_reader(file_path: &String) -> Result<(File, u64), Error> {
+    fn open_file_reader(file_path: &String) -> Result<(File, usize), Error> {
         let file_path_clone = file_path.clone();
         let file_reader_result = OpenOptions::new().read(true).open(file_path_clone);
         if file_reader_result.is_err() {
@@ -169,7 +169,7 @@ impl Storage {
             });
         }
         let file_reader = file_reader_result.unwrap();
-        let read_pointer = 0 as u64;
+        let read_pointer = 0 as usize;
         Ok((file_reader, read_pointer))
     }
 
@@ -178,7 +178,7 @@ impl Storage {
     /// Create new storage file
     /// - Create/Overwrite new storage file in given path
     /// - Initializes storage header
-    pub fn new(file_path: String, block_len: usize) -> Result<Storage, Error> {
+    pub fn new(file_path: String, block_len: u32) -> Result<Storage, Error> {
         let file_writer = Storage::open_file_writer(&file_path, true);
         if file_writer.is_err() {
             return Err(file_writer.unwrap_err());
@@ -192,7 +192,7 @@ impl Storage {
         let (file_reader, read_pointer) = file_reader.unwrap();
 
         let mut storage = Storage {
-            header: StorageHeader::new(block_len as u32),
+            header: StorageHeader::new(block_len),
             free_blocks: BTreeSet::new(),
             end_block_count: 0,
             file_writer,
@@ -256,12 +256,11 @@ impl Storage {
     // ... ... ... ... ... . InMemory Logic Functions ... ... ... ... ....
 
     /// check if block is within storage file, without reading it from file (in memory)
-    fn block_exists(&mut self, block_index: u32) -> bool {
+    fn block_exists(&mut self, block_index: usize) -> bool {
         block_index < self.end_block_count
     }
     /// Check if block is empty, without reading it from file (in memory)
     fn is_empty_block(&mut self, block_index: usize) -> bool {
-        let block_index = block_index as u32;
         if self.block_exists(block_index) {
             if self.free_blocks.contains(&block_index) {
                 return true;
@@ -295,7 +294,7 @@ impl Storage {
             });
         }
         // -- write storage header
-        self.write_pointer = ptr_seek_result.unwrap();
+        self.write_pointer = ptr_seek_result.unwrap() as usize;
         let write_result = file.write(&header_bytes);
         if write_result.is_err() {
             return Err(Error {
@@ -305,14 +304,14 @@ impl Storage {
         }
         // -- verify write operation was successful
         let write_size = write_result.unwrap();
-        if write_size != STORAGE_HEADER_SIZE as usize {
+        if write_size != STORAGE_HEADER_SIZE {
             return Err(Error {
                 code: 2,
                 message: "Could not write all header bytes to file".to_string(),
             });
         }
-        self.write_pointer += write_size as u64;
-        Ok(self.write_pointer as usize)
+        self.write_pointer += write_size;
+        Ok(self.write_pointer)
     }
     /// Get storage header from storage file
     /// - Read storage header from file
@@ -332,7 +331,7 @@ impl Storage {
         }
         // -- read storage header
         let mut header_bytes = [0u8; STORAGE_HEADER_SIZE];
-        self.read_pointer = ptr_seek_result.unwrap();
+        self.read_pointer = ptr_seek_result.unwrap() as usize;
         let read_result = file.read(&mut header_bytes);
         if read_result.is_err() {
             return Err(Error {
@@ -349,7 +348,7 @@ impl Storage {
             });
         }
         // -- update read pointer
-        self.read_pointer += read_size as u64;
+        self.read_pointer += read_size;
         // - parse storage header
         let storage_header = StorageHeader::from_bytes(&header_bytes);
         // - copy storage header to storage object
@@ -373,7 +372,7 @@ impl Storage {
             });
         }
         // - update read pointer
-        self.read_pointer = ptr_seek_result.unwrap();
+        self.read_pointer = ptr_seek_result.unwrap() as usize;
         // - read file and count
         // -- total blocks - update self.end_block_count
         // -- free blocks - update self.free_blocks
@@ -405,14 +404,14 @@ impl Storage {
                 // end of file reached
                 break;
             }
-            if read_size != BLOCK_HEADER_SIZE as usize {
+            if read_size != BLOCK_HEADER_SIZE {
                 return Err(Error {
                     code: 2,
                     message: "Could not read all header bytes from file".to_string(),
                 });
             }
             // -- update read pointer
-            self.read_pointer += read_size as u64;
+            self.read_pointer += read_size;
             // -- parse block header
             let block_header = BlockHeader::from_bytes(&block_header_bytes);
             // - check if block is free
@@ -431,7 +430,7 @@ impl Storage {
                     message: "Could not seek file pointer".to_string(),
                 });
             }
-            let ptr_seek_result = ptr_seek_result.unwrap();
+            let ptr_seek_result = ptr_seek_result.unwrap() as usize;
             self.read_pointer = ptr_seek_result;
             // -- verify seek operation was successful
             if ptr_seek_result != self.read_pointer {
@@ -444,7 +443,7 @@ impl Storage {
         // - update free blocks
         self.free_blocks = free_blocks;
         // - return
-        Ok(self.read_pointer as usize)
+        Ok(self.read_pointer)
     }
     /// Read block data from storage file
     /// - return (block_data, read_pointer)
@@ -469,8 +468,8 @@ impl Storage {
             });
         }
         // verify seek operation was successful
-        let seek_position = seek_result.unwrap();
-        if seek_position != block_offset as u64 {
+        let seek_position = seek_result.unwrap() as usize;
+        if seek_position != block_offset {
             return Err(Error {
                 code: 3,
                 message: "Could not seek to block offset".to_string(),
@@ -493,7 +492,7 @@ impl Storage {
                 message: "Could not read all block data size bytes from file".to_string(),
             });
         }
-        self.read_pointer += read_size as u64;
+        self.read_pointer += read_size;
         let block_header = BlockHeader::new(bytes_to_u32(block_data_size_bytes));
         // - read block data to vec
         let mut block_data = vec![0u8; block_header.block_data_size as usize];
@@ -504,23 +503,23 @@ impl Storage {
                 message: "Could not read from file".to_string(),
             });
         }
-        let read_size = read_result.unwrap() as u32;
-        self.read_pointer += read_size as u64;
+        let read_size = read_result.unwrap();
+        self.read_pointer += read_size;
         // - verify read operation was successful
-        if read_size != block_header.block_data_size {
+        if read_size != block_header.block_data_size as usize {
             return Err(Error {
                 code: 4,
                 message: "Could not read all block data from file".to_string(),
             });
         }
         // - return read_pointer and block_data
-        Ok((self.read_pointer as usize, block_data))
+        Ok((self.read_pointer, block_data))
     }
     pub fn write_block(&mut self, block_index: usize, data: &Vec<u8>) -> Result<usize, Error> {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset = STORAGE_HEADER_SIZE as usize
-            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
+        let block_offset =
+            STORAGE_HEADER_SIZE + block_index * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -532,8 +531,8 @@ impl Storage {
             });
         }
         // -- verify seek operation was successful
-        let seek_position = seek_result.unwrap();
-        if seek_position != block_offset as u64 {
+        let seek_position = seek_result.unwrap() as usize;
+        if seek_position != block_offset {
             return Err(Error {
                 code: 5,
                 message: "Could not seek to block offset".to_string(),
@@ -551,7 +550,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
-        self.write_pointer += write_size as u64;
+        self.write_pointer += write_size;
         // -- verify write operation was successful
         if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
@@ -569,7 +568,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
-        self.write_pointer += write_size as u64;
+        self.write_pointer += write_size;
         // -- verify write operation was successful
         if write_size != data.len() {
             return Err(Error {
@@ -578,7 +577,6 @@ impl Storage {
             });
         }
         // - update free_blocks map
-        let block_index = block_index as u32;
         self.free_blocks.remove(&block_index);
         // - update max_block_index
         if block_index >= self.end_block_count {
@@ -588,16 +586,15 @@ impl Storage {
         Ok(self.write_pointer as usize)
     }
     pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<usize, Error> {
-        let block_index = block_index as u32;
-        if !self.block_exists(block_index as u32) {
-            return Ok(self.write_pointer as usize);
+        if !self.block_exists(block_index) {
+            return Ok(self.write_pointer);
         } else if hard_delete == false && self.free_blocks.contains(&block_index) {
-            return Ok(self.write_pointer as usize);
+            return Ok(self.write_pointer);
         }
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset = STORAGE_HEADER_SIZE as usize
-            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
+        let block_offset =
+            STORAGE_HEADER_SIZE + block_index * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -609,14 +606,14 @@ impl Storage {
             });
         }
         // -- verify seek operation was successful
-        let seek_position = seek_result.unwrap();
-        if seek_position != block_offset as u64 {
+        let seek_position = seek_result.unwrap() as usize;
+        if seek_position != block_offset {
             return Err(Error {
                 code: 10,
                 message: "Could not seek to block offset".to_string(),
             });
         }
-        self.write_pointer = block_offset as u64;
+        self.write_pointer = block_offset;
         // - Write Block Header
         // -- write block header to inital BLOCK_HEADER_SIZE bytes
         let block_header = BlockHeader::new(0);
@@ -628,7 +625,7 @@ impl Storage {
             });
         }
         let write_size = write_result.unwrap();
-        self.write_pointer += write_size as u64;
+        self.write_pointer += write_size;
         // -- verify write operation was successful
         if write_size != BLOCK_HEADER_SIZE {
             return Err(Error {
@@ -657,12 +654,37 @@ impl Storage {
                 });
             }
             // -- increment write pointer
-            self.write_pointer += write_size as u64;
+            self.write_pointer += write_size;
         }
         // update free_blocks map
         self.free_blocks.insert(block_index);
         // return write pointer
         Ok(self.write_pointer as usize)
+    }
+
+    // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
+
+    // ... ... ... ... ... ... Abstract Functions ... ... ... ... ... ... .
+
+    /// Return blocks in storage to write data to, in assending order of index
+    /// - collect free blocks
+    /// - if free blocks not enough, extend storage
+    pub fn search_block_allocation_indexes(&self, count: usize) -> Vec<usize> {
+        let mut available_free_blocks = self
+            .free_blocks
+            .iter()
+            .cloned()
+            .map(|x| x as usize)
+            .collect::<Vec<usize>>();
+        available_free_blocks.truncate(count);
+        available_free_blocks.sort();
+        // push indexes beyond end_block_count if required
+        for i in
+            (self.end_block_count)..(self.end_block_count + count - available_free_blocks.len())
+        {
+            available_free_blocks.push(i);
+        }
+        available_free_blocks
     }
 
     // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
