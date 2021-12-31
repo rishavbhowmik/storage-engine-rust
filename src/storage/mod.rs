@@ -3,18 +3,23 @@ use error::Error;
 mod util;
 use util::*;
 
+/// 4 bytes for index for a block
+type BlockIndex = u32;
+/// 4 bytes to store, blockLength, blockSize
+type BlockLength = u32; // stored in file
+
 //  ... ... ... ... ... ... ... ... Storage Header ... ... ... ... ... ... ... ... ... ..
 
 /// Main Header for storage file
 /// - Stores constant capacity of each block as 4 bytes unsied integer as little endian
 struct StorageHeader {
-    block_len: u32,
+    block_len: BlockLength,
 }
 
 const STORAGE_HEADER_SIZE: usize = std::mem::size_of::<StorageHeader>();
 
 impl StorageHeader {
-    fn new(block_len: u32) -> Self {
+    fn new(block_len: BlockLength) -> Self {
         StorageHeader { block_len }
     }
     fn from_bytes(bytes: &[u8; STORAGE_HEADER_SIZE]) -> StorageHeader {
@@ -60,7 +65,7 @@ mod unit_tests_storage_header {
 /// Header of each block
 /// - Stores size of data stored in the block as 4 bytes unsied integer as little endian
 struct BlockHeader {
-    block_data_size: u32,
+    block_data_size: BlockLength,
 }
 
 const BLOCK_HEADER_SIZE: usize = std::mem::size_of::<BlockHeader>();
@@ -119,9 +124,9 @@ use std::fs::{File, OpenOptions};
 pub struct Storage {
     header: StorageHeader,
     /// Map of empty blocks in the storage file
-    free_blocks: BTreeSet<usize>,
+    free_blocks: BTreeSet<BlockIndex>,
     /// Number of blocks in the storage file (used or free)
-    end_block_count: usize,
+    end_block_count: BlockIndex,
     /// File object for writing
     file_writer: File,
     /// Index of last written byte in the file
@@ -256,11 +261,11 @@ impl Storage {
     // ... ... ... ... ... . InMemory Logic Functions ... ... ... ... ....
 
     /// check if block is within storage file, without reading it from file (in memory)
-    fn block_exists(&mut self, block_index: usize) -> bool {
+    fn block_exists(&mut self, block_index: BlockIndex) -> bool {
         block_index < self.end_block_count
     }
     /// Check if block is empty, without reading it from file (in memory)
-    fn is_empty_block(&mut self, block_index: usize) -> bool {
+    fn is_empty_block(&mut self, block_index: BlockIndex) -> bool {
         if self.block_exists(block_index) {
             if self.free_blocks.contains(&block_index) {
                 return true;
@@ -448,15 +453,15 @@ impl Storage {
     /// Read block data from storage file
     /// - return (block_data, read_pointer)
     /// - returns: read pointer
-    pub fn read_block(&mut self, block_index: usize) -> Result<(usize, Vec<u8>), Error> {
+    pub fn read_block(&mut self, block_index: BlockIndex) -> Result<(usize, Vec<u8>), Error> {
         if self.is_empty_block(block_index) {
             // return current read_pointer and empty vector
             return Ok((self.read_pointer as usize, Vec::new()));
         }
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset: usize = STORAGE_HEADER_SIZE as usize
-            + block_index as usize * (BLOCK_HEADER_SIZE as usize + block_length as usize);
+        let block_offset: usize =
+            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek reader to block offset
         let seek_result = self
             .file_reader
@@ -515,11 +520,11 @@ impl Storage {
         // - return read_pointer and block_data
         Ok((self.read_pointer, block_data))
     }
-    pub fn write_block(&mut self, block_index: usize, data: &Vec<u8>) -> Result<usize, Error> {
+    pub fn write_block(&mut self, block_index: BlockIndex, data: &Vec<u8>) -> Result<usize, Error> {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
         let block_offset =
-            STORAGE_HEADER_SIZE + block_index * (BLOCK_HEADER_SIZE + block_length as usize);
+            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -541,7 +546,7 @@ impl Storage {
         self.write_pointer = seek_position;
         // - Write Block Header
         // -- write block header to inital BLOCK_HEADER_SIZE bytes
-        let block_header = BlockHeader::new(data.len() as u32);
+        let block_header = BlockHeader::new(data.len() as BlockLength);
         let write_result = self.file_writer.write(&block_header.to_bytes());
         if write_result.is_err() {
             return Err(Error {
@@ -583,9 +588,9 @@ impl Storage {
             self.end_block_count = block_index + 1;
         }
         // return write pointer
-        Ok(self.write_pointer as usize)
+        Ok(self.write_pointer)
     }
-    pub fn delete_block(&mut self, block_index: usize, hard_delete: bool) -> Result<usize, Error> {
+    pub fn delete_block(&mut self, block_index: BlockIndex, hard_delete: bool) -> Result<usize, Error> {
         if !self.block_exists(block_index) {
             return Ok(self.write_pointer);
         } else if hard_delete == false && self.free_blocks.contains(&block_index) {
@@ -594,7 +599,7 @@ impl Storage {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
         let block_offset =
-            STORAGE_HEADER_SIZE + block_index * (BLOCK_HEADER_SIZE + block_length as usize);
+            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -659,7 +664,7 @@ impl Storage {
         // update free_blocks map
         self.free_blocks.insert(block_index);
         // return write pointer
-        Ok(self.write_pointer as usize)
+        Ok(self.write_pointer)
     }
 
     // ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ... ...
@@ -669,20 +674,20 @@ impl Storage {
     /// Return blocks in storage to write data to, in assending order of index
     /// - collect free blocks
     /// - if free blocks not enough, extend storage
-    pub fn search_block_allocation_indexes(&self, count: usize) -> Vec<usize> {
+    pub fn search_block_allocation_indexes(&self, count: BlockIndex) -> Vec<BlockIndex> {
         let mut available_free_blocks = self
             .free_blocks
             .iter()
             .cloned()
-            .map(|x| x as usize)
-            .collect::<Vec<usize>>();
-        available_free_blocks.truncate(count);
+            .map(|x| x as BlockIndex)
+            .collect::<Vec<BlockIndex>>();
+        available_free_blocks.truncate(count as usize);
         available_free_blocks.sort();
         // push indexes beyond end_block_count if required
         for i in
-            (self.end_block_count)..(self.end_block_count + count - available_free_blocks.len())
+            (self.end_block_count as usize)..(self.end_block_count as usize + count as usize - available_free_blocks.len())
         {
-            available_free_blocks.push(i);
+            available_free_blocks.push(i as BlockIndex);
         }
         available_free_blocks
     }

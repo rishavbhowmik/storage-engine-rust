@@ -263,7 +263,7 @@ fn storage_open_existing_file1_test_abstract_fn() {
     let storage = Storage::open(String::from(tmp_file_path)).unwrap();
     // available free blocks: {0, 1}, endblock: 2
     // - search for 1 block
-    let expected = vec![0 as usize];
+    let expected = vec![0 as u32];
     let actual = storage.search_block_allocation_indexes(1);
     assert_eq!(expected, actual);
     // - search for 2 blocks
