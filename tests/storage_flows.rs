@@ -243,3 +243,43 @@ fn storage_open_existing_file1() {
 
 #[test]
 fn storage_open_existing_file2() {}
+
+#[test]
+fn storage_open_existing_file1_test_abstract_fn() {
+    // let tmp_file_path = "./tmp/storage_open_existing_file1.hex";
+    let tmp_dir_path = tempfile::tempdir().unwrap().into_path();
+    let tmp_file_path: std::path::PathBuf = [
+        tmp_dir_path.to_str().unwrap().to_string(),
+        String::from("storage_open_existing_file1.hex"),
+    ]
+    .iter()
+    .collect();
+    // copy "tests/samples/storage_open_existing_file1/w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2.hex" to tmp_file_path
+    let mut src_path = std::path::PathBuf::from("tests/samples/storage_open_existing_file1");
+    src_path.push("w-0_w-1_w-2_sd-0_hd-0_sd-1_hd-2.hex");
+    std::fs::copy(src_path, tmp_file_path.clone()).unwrap();
+    let tmp_file_path = tmp_file_path.to_str().unwrap();
+    // open storage
+    let storage = Storage::open(String::from(tmp_file_path)).unwrap();
+    // available free blocks: {0, 1}, endblock: 2
+    // - search for 1 block
+    let expected = vec![0 as usize];
+    let actual = storage.search_block_allocation_indexes(1);
+    assert_eq!(expected, actual);
+    // - search for 2 blocks
+    let expected = vec![0, 1];
+    let actual = storage.search_block_allocation_indexes(2);
+    assert_eq!(expected, actual);
+    // - search for 3 blocks
+    let expected = vec![0, 1, 3];
+    let actual = storage.search_block_allocation_indexes(3);
+    assert_eq!(expected, actual);
+    // - search for 4 blocks
+    let expected = vec![0, 1, 3, 4];
+    let actual = storage.search_block_allocation_indexes(4);
+    assert_eq!(expected, actual);
+    // - search for 5 blocks
+    let expected = vec![0, 1, 3, 4, 5];
+    let actual = storage.search_block_allocation_indexes(5);
+    assert_eq!(expected, actual);
+}
