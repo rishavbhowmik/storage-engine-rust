@@ -1,10 +1,10 @@
-mod error;
+pub mod error;
 use error::Error;
 mod util;
 use util::*;
 
 /// 4 bytes for index for a block
-type BlockIndex = u32;
+pub type BlockIndex = u32;
 /// 4 bytes to store, blockLength, blockSize
 type BlockLength = u32; // stored in file
 
@@ -138,6 +138,9 @@ pub struct Storage {
 }
 
 impl Storage {
+    pub fn block_len(&self) -> BlockLength {
+        self.header.block_len
+    }
     //  ... ... ... ... ... ... Static Functions ... ... ... ... ... ... .
 
     /// Open storage file for writing
