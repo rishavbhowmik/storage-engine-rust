@@ -1,6 +1,6 @@
 pub mod storage;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use storage::{BlockIndex, Storage, error::Error};
+use storage::{error::Error, BlockIndex, Storage};
 
 type ReadRequestChanRes = Result<Vec<u8>, Error>;
 type ReadRequest = (
@@ -28,10 +28,7 @@ type IORequest = (
     Option<WriteRequest>,
     Option<DeleteRequest>,
 );
-type IORequestChan = (
-    Sender<IORequest>,
-    Receiver<IORequest>,
-);
+type IORequestChan = (Sender<IORequest>, Receiver<IORequest>);
 
 use std::collections::LinkedList;
 struct Engine {
@@ -83,10 +80,13 @@ impl Engine {
         // - Write to allocated blocks
         for writeRequest in write_requests {
             let (data, sender, receiver) = writeRequest;
-            let indexes: Vec<BlockIndex> = self.storage.search_block_allocation_indexes(data.len() as BlockIndex);
+            let indexes: Vec<BlockIndex> = self
+                .storage
+                .search_block_allocation_indexes(data.len() as BlockIndex);
             let mut data_write_ptr = 0 as usize;
             for index in indexes {
-                let data_chunk = &data[data_write_ptr..(data_write_ptr + self.storage.block_len() as usize)];
+                let data_chunk =
+                    &data[data_write_ptr..(data_write_ptr + self.storage.block_len() as usize)];
                 let write_result = self.storage.write_block(index, vec![data_chunk]);
                 if write_result.is_err() {
                     sender.send(Err(write_result.err().unwrap())).unwrap();
@@ -111,11 +111,5 @@ impl Engine {
         }
         // - Atomic Lock
     }
-    fn server() {
-        // append to read_requests
-        // append to write_requests
-        // thread: - io cycle
-        // clear read_requests
-        // clear write_requests
-    }
+    fn server() {}
 }

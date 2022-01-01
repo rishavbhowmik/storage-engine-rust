@@ -463,8 +463,8 @@ impl Storage {
         }
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset: usize =
-            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
+        let block_offset: usize = STORAGE_HEADER_SIZE
+            + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek reader to block offset
         let seek_result = self
             .file_reader
@@ -526,8 +526,8 @@ impl Storage {
     pub fn write_block(&mut self, block_index: BlockIndex, data: &Vec<u8>) -> Result<usize, Error> {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset =
-            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
+        let block_offset = STORAGE_HEADER_SIZE
+            + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -593,7 +593,11 @@ impl Storage {
         // return write pointer
         Ok(self.write_pointer)
     }
-    pub fn delete_block(&mut self, block_index: BlockIndex, hard_delete: bool) -> Result<usize, Error> {
+    pub fn delete_block(
+        &mut self,
+        block_index: BlockIndex,
+        hard_delete: bool,
+    ) -> Result<usize, Error> {
         if !self.block_exists(block_index) {
             return Ok(self.write_pointer);
         } else if hard_delete == false && self.free_blocks.contains(&block_index) {
@@ -601,8 +605,8 @@ impl Storage {
         }
         use std::io::prelude::*;
         let block_length = self.header.block_len;
-        let block_offset =
-            STORAGE_HEADER_SIZE + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
+        let block_offset = STORAGE_HEADER_SIZE
+            + block_index as usize * (BLOCK_HEADER_SIZE + block_length as usize);
         // - seek writer to block offset
         let seek_result = self
             .file_writer
@@ -687,8 +691,8 @@ impl Storage {
         available_free_blocks.truncate(count as usize);
         available_free_blocks.sort();
         // push indexes beyond end_block_count if required
-        for i in
-            (self.end_block_count as usize)..(self.end_block_count as usize + count as usize - available_free_blocks.len())
+        for i in (self.end_block_count as usize)
+            ..(self.end_block_count as usize + count as usize - available_free_blocks.len())
         {
             available_free_blocks.push(i as BlockIndex);
         }
