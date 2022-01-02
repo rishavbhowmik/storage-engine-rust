@@ -23,7 +23,7 @@ type DeleteRequest = (
     Receiver<DeleteRequestChanRes>,
 );
 
-type IORequest = (
+pub type IORequest = (
     Option<ReadRequest>,
     Option<WriteRequest>,
     Option<DeleteRequest>,
@@ -36,13 +36,13 @@ pub struct Engine {
 }
 
 impl Engine {
-    fn new(storage: Storage) -> Self {
+    pub fn new(storage: Storage) -> Self {
         Engine {
             storage: storage,
             request_queue: LinkedList::new(),
         }
     }
-    fn io_cycle(&mut self) {
+    pub fn io_cycle(&mut self) {
         let mut read_requests: Vec<&ReadRequest> = Vec::new();
         let mut write_requests: Vec<&WriteRequest> = Vec::new();
         let mut delete_requests: Vec<&DeleteRequest> = Vec::new();
@@ -108,7 +108,7 @@ impl Engine {
         }
         // - Atomic Lock
     }
-    fn append_request(&mut self, request: IORequest) {
+    pub fn append_request(&mut self, request: IORequest) {
         self.request_queue.push_back(request);
     }
 }
