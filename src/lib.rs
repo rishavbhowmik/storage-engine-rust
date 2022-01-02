@@ -1,5 +1,5 @@
 pub mod storage;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 use storage::{error::Error, BlockIndex, Storage};
 
 type ReadRequestChanRes = Result<Vec<u8>, Error>;
@@ -28,12 +28,11 @@ type IORequest = (
     Option<WriteRequest>,
     Option<DeleteRequest>,
 );
-type IORequestChan = (Sender<IORequest>, Receiver<IORequest>);
+
 
 use std::collections::LinkedList;
-struct Engine {
+pub struct Engine {
     storage: Storage,
-    request_chan: IORequestChan,
     request_queue: LinkedList<IORequest>,
 }
 
@@ -41,7 +40,6 @@ impl Engine {
     fn new(storage: Storage) -> Self {
         Engine {
             storage: storage,
-            request_chan: channel(),
             request_queue: LinkedList::new(),
         }
     }
@@ -52,8 +50,8 @@ impl Engine {
         for request in &self.request_queue {
             match request {
                 (Some(read_request), _, _) => read_requests.push(read_request),
-                (None, Some(write_request), _) => write_requests.push(write_request),
-                (None, None, Some(delete_request)) => delete_requests.push(delete_request),
+                (_, Some(write_request), _) => write_requests.push(write_request),
+                (_, _, Some(delete_request)) => delete_requests.push(delete_request),
                 (None, None, None) => panic!("Invalid request"),
             }
         }
@@ -84,10 +82,10 @@ impl Engine {
                 .storage
                 .search_block_allocation_indexes(data.len() as BlockIndex);
             let mut data_write_ptr = 0 as usize;
-            for index in indexes {
+            for index in indexes.clone() {
                 let data_chunk =
                     &data[data_write_ptr..(data_write_ptr + self.storage.block_len() as usize)];
-                let write_result = self.storage.write_block(index, vec![data_chunk]);
+                let write_result = self.storage.write_block(index, data_chunk);
                 if write_result.is_err() {
                     sender.send(Err(write_result.err().unwrap())).unwrap();
                     return;
@@ -111,5 +109,7 @@ impl Engine {
         }
         // - Atomic Lock
     }
-    fn server() {}
+    fn append_request(&mut self, request: IORequest) {
+        self.request_queue.push_back(request);
+    }
 }
