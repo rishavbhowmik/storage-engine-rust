@@ -29,7 +29,6 @@ type IORequest = (
     Option<DeleteRequest>,
 );
 
-
 use std::collections::LinkedList;
 pub struct Engine {
     storage: Storage,
