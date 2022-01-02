@@ -523,7 +523,7 @@ impl Storage {
         // - return read_pointer and block_data
         Ok((self.read_pointer, block_data))
     }
-    pub fn write_block(&mut self, block_index: BlockIndex, data: &Vec<u8>) -> Result<usize, Error> {
+    pub fn write_block(&mut self, block_index: BlockIndex, data: &[u8]) -> Result<usize, Error> {
         use std::io::prelude::*;
         let block_length = self.header.block_len;
         let block_offset = STORAGE_HEADER_SIZE
