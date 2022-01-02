@@ -42,11 +42,11 @@ impl Engine {
             request_queue: LinkedList::new(),
         }
     }
-    pub fn io_cycle(&mut self) {
+    pub fn io_cycle(engine: &mut Engine) {
         let mut read_requests: Vec<&ReadRequest> = Vec::new();
         let mut write_requests: Vec<&WriteRequest> = Vec::new();
         let mut delete_requests: Vec<&DeleteRequest> = Vec::new();
-        for request in &self.request_queue {
+        for request in &engine.request_queue {
             match request {
                 (Some(read_request), _, _) => read_requests.push(read_request),
                 (_, Some(write_request), _) => write_requests.push(write_request),
@@ -62,7 +62,7 @@ impl Engine {
             // indexes must be pre-sorted
             for index_iter in indexes {
                 let index = *index_iter;
-                let read_result = self.storage.read_block(index);
+                let read_result = engine.storage.read_block(index);
                 if read_result.is_err() {
                     sender.send(Err(read_result.err().unwrap())).unwrap();
                     return;
@@ -77,14 +77,14 @@ impl Engine {
         // - Write to allocated blocks
         for writeRequest in write_requests {
             let (data, sender, receiver) = writeRequest;
-            let indexes: Vec<BlockIndex> = self
+            let indexes: Vec<BlockIndex> = engine
                 .storage
                 .search_block_allocation_indexes(data.len() as BlockIndex);
             let mut data_write_ptr = 0 as usize;
             for index in indexes.clone() {
                 let data_chunk =
-                    &data[data_write_ptr..(data_write_ptr + self.storage.block_len() as usize)];
-                let write_result = self.storage.write_block(index, data_chunk);
+                    &data[data_write_ptr..(data_write_ptr + engine.storage.block_len() as usize)];
+                let write_result = engine.storage.write_block(index, data_chunk);
                 if write_result.is_err() {
                     sender.send(Err(write_result.err().unwrap())).unwrap();
                     return;
@@ -98,7 +98,7 @@ impl Engine {
         for deleteRequest in delete_requests {
             let ((indexes, hard_delete), sender, receiver) = deleteRequest;
             for index in indexes {
-                let delete_result = self.storage.delete_block(*index, *hard_delete);
+                let delete_result = engine.storage.delete_block(*index, *hard_delete);
                 if delete_result.is_err() {
                     sender.send(Err(delete_result.err().unwrap())).unwrap();
                     return;
@@ -110,5 +110,8 @@ impl Engine {
     }
     pub fn append_request(&mut self, request: IORequest) {
         self.request_queue.push_back(request);
+    }
+    pub fn clear_requests(&mut self) {
+        self.request_queue.clear();
     }
 }
